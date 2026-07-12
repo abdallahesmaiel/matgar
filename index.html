@@ -98,7 +98,7 @@
         .modal-close{background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--gray-400);transition:0.2s}
         .modal-close:hover{color:var(--danger)}
 
-        /* ===== IMPROVED RECEIPT STYLES ===== */
+        /* ===== RECEIPT STYLES ===== */
         .receipt-print{padding:0;max-width:380px;margin:0 auto;font-size:0.85rem}
         .receipt-print .receipt-header{text-align:center;border-bottom:2px dashed var(--gray-300);padding-bottom:0.8rem;margin-bottom:0.8rem}
         .receipt-print .receipt-header h3{font-size:1.3rem;color:var(--primary);margin-bottom:0.2rem}
@@ -291,59 +291,29 @@
             let state = { products: [], customers: [], suppliers: [], employees: [], transactions: [], payments: [] };
             const MAIN_KEY = 'smart_store_all_data_v2';
 
-            // ===== SAVE (localStorage primary, IndexedDB backup) =====
             function saveAllData() {
                 try {
                     const json = JSON.stringify(state);
                     localStorage.setItem(MAIN_KEY, json);
-                    // Also try IndexedDB as backup
                     try {
                         const req = indexedDB.open('SmartStoreDB', 1);
-                        req.onupgradeneeded = function(e) {
-                            if (!e.target.result.objectStoreNames.contains('data')) {
-                                e.target.result.createObjectStore('data', { keyPath: 'id' });
-                            }
-                        };
-                        req.onsuccess = function(e) {
-                            const db = e.target.result;
-                            const tx = db.transaction('data', 'readwrite');
-                            tx.objectStore('data').put({ id: 'main', value: json });
-                        };
+                        req.onupgradeneeded = function(e) { if (!e.target.result.objectStoreNames.contains('data')) { e.target.result.createObjectStore('data', { keyPath: 'id' }); } };
+                        req.onsuccess = function(e) { const db = e.target.result; const tx = db.transaction('data', 'readwrite'); tx.objectStore('data').put({ id: 'main', value: json }); };
                         req.onerror = function() {};
                     } catch(e) {}
                     showSaveIndicator();
                     return true;
-                } catch(e) {
-                    console.warn('Save failed:', e);
-                    return false;
-                }
+                } catch(e) { console.warn('Save failed:', e); return false; }
             }
 
             function loadAllData() {
-                // Try localStorage first
                 const localData = localStorage.getItem(MAIN_KEY);
-                if (localData) {
-                    try {
-                        const parsed = JSON.parse(localData);
-                        if (parsed && parsed.products) {
-                            state = parsed;
-                            return;
-                        }
-                    } catch(e) {}
-                }
-                // Reset to empty if nothing found
+                if (localData) { try { const parsed = JSON.parse(localData); if (parsed && parsed.products) { state = parsed; return; } } catch(e) {} }
                 state = { products: [], customers: [], suppliers: [], employees: [], transactions: [], payments: [] };
             }
 
             let saveTimeout;
-            function showSaveIndicator() {
-                const el = document.getElementById('autoSaveIndicator');
-                el.classList.add('show');
-                clearTimeout(saveTimeout);
-                saveTimeout = setTimeout(() => el.classList.remove('show'), 1500);
-            }
-
-            // Auto-save every 5 seconds
+            function showSaveIndicator() { const el = document.getElementById('autoSaveIndicator'); el.classList.add('show'); clearTimeout(saveTimeout); saveTimeout = setTimeout(() => el.classList.remove('show'), 1500); }
             setInterval(saveAllData, 5000);
 
             function genId() { return Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 6); }
@@ -357,36 +327,13 @@
                 setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateX(100%)'; t.style.transition = 'all 0.3s ease'; setTimeout(() => t.remove(), 300); }, 3000);
             }
 
-            function exportData() {
-                const b = new Blob([JSON.stringify(state)], { type: 'application/json' });
-                const a = document.createElement('a'); a.href = URL.createObjectURL(b);
-                a.download = `متجر_ذكي_${new Date().toISOString().slice(0,10)}.json`;
-                document.body.appendChild(a); a.click(); document.body.removeChild(a); toast('تم التصدير');
-            }
+            function exportData() { const b = new Blob([JSON.stringify(state)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `متجر_ذكي_${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); toast('تم التصدير'); }
+            function importData(file) { const r = new FileReader(); r.onload = function(e) { try { const d = JSON.parse(e.target.result); if (d && d.products) { state = d; saveAllData(); refreshAll(); toast('تم استيراد البيانات'); } else toast('ملف غير صالح', 'error'); } catch(err) { toast('ملف غير صالح', 'error'); } }; r.readAsText(file); }
+            function clearData() { if (!confirm('مسح جميع البيانات؟')) return; state = { products: [], customers: [], suppliers: [], employees: [], transactions: [], payments: [] }; saveAllData(); refreshAll(); toast('تم المسح'); }
 
-            function importData(file) {
-                const r = new FileReader();
-                r.onload = function(e) {
-                    try {
-                        const d = JSON.parse(e.target.result);
-                        if (d && d.products) { state = d; saveAllData(); refreshAll(); toast('تم استيراد البيانات'); }
-                        else toast('ملف غير صالح', 'error');
-                    } catch(err) { toast('ملف غير صالح', 'error'); }
-                };
-                r.readAsText(file);
-            }
-
-            function clearData() {
-                if (!confirm('مسح جميع البيانات؟')) return;
-                state = { products: [], customers: [], suppliers: [], employees: [], transactions: [], payments: [] };
-                saveAllData(); refreshAll(); toast('تم المسح');
-            }
-
-            // ===== Navigation =====
             function navigateTo(section) {
                 document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-                const target = document.getElementById(section);
-                if (target) target.classList.add('active');
+                const target = document.getElementById(section); if (target) target.classList.add('active');
                 document.querySelectorAll('#sidebarMenu a, #topNavDesktop a').forEach(l => { l.classList.remove('active'); if (l.dataset.section === section) l.classList.add('active'); });
                 populateSelects();
             }
@@ -395,17 +342,11 @@
                 const toggle = document.getElementById('menuToggle'), sidebar = document.getElementById('sidebar'), overlay = document.getElementById('sidebarOverlay');
                 function open() { sidebar.classList.add('open'); overlay.classList.add('active'); }
                 function close() { sidebar.classList.remove('open'); overlay.classList.remove('active'); }
-                toggle?.addEventListener('click', open);
-                overlay?.addEventListener('click', close);
-                document.querySelectorAll('#sidebarMenu a').forEach(l => {
-                    l.addEventListener('click', function() { navigateTo(this.dataset.section); close(); });
-                });
-                document.querySelectorAll('#topNavDesktop a').forEach(l => {
-                    l.addEventListener('click', function() { navigateTo(this.dataset.section); });
-                });
+                toggle?.addEventListener('click', open); overlay?.addEventListener('click', close);
+                document.querySelectorAll('#sidebarMenu a').forEach(l => { l.addEventListener('click', function() { navigateTo(this.dataset.section); close(); }); });
+                document.querySelectorAll('#topNavDesktop a').forEach(l => { l.addEventListener('click', function() { navigateTo(this.dataset.section); }); });
             }
 
-            // ===== Calculations =====
             function getTT(pt, pid) { return state.transactions.filter(t => t.type === pt && t.partyId === pid).reduce((s, t) => s + (t.total || 0), 0); }
             function getPT(pt, pid) { return state.payments.filter(p => p.partyType === pt && p.partyId === pid).reduce((s, p) => s + (p.amount || 0), 0); }
             function custBal(id) { return getTT('customer', id) - getPT('customer', id); }
@@ -430,36 +371,21 @@
 
             function updateLowStock() { const ls = lowStock(), el = document.getElementById('low-stock-alert'), msg = document.getElementById('low-stock-message'); if (ls.length > 0) { el.classList.add('show'); msg.textContent = `⚠️ مخزون منخفض: ${ls.map(p => `${p.name} (${p.quantity})`).join('، ')}`; } else el.classList.remove('show'); }
 
-            function renderProducts() {
-                const tb = document.querySelector('#products-table tbody'); if (!tb) return;
-                if (state.products.length === 0) tb.innerHTML = `<tr><td colspan="9"><div class="empty-state"><i class="fas fa-box-open"></i>لا توجد منتجات</div></td></tr>`;
-                else tb.innerHTML = state.products.map(p => { const pf = prodProfit(p); return `<tr><td>${p.image ? `<img src="${p.image}" class="product-image-thumb">` : '—'}</td><td><strong>${p.name}</strong></td><td>${(p.cost||0).toFixed(0)}</td><td>${(p.price||0).toFixed(0)}</td><td><span class="profit-badge ${pf>=0?'positive':'negative'}">${pf.toFixed(0)}</span></td><td><span class="badge ${p.quantity<=5?'badge-danger':p.quantity<=20?'badge-warning':'badge-success'}">${p.quantity}</span></td><td>${(p.price*p.quantity).toFixed(0)}</td><td>${p.barcode?`<span class="badge badge-primary">${p.barcode}</span>`:'—'}</td><td><div class="action-buttons"><button class="btn btn-primary btn-xs" onclick="editProduct('${p.id}')"><i class="fas fa-edit"></i></button><button class="btn btn-danger btn-xs" onclick="deleteProduct('${p.id}')"><i class="fas fa-trash"></i></button></div></td></tr>`; }).join('');
-                document.getElementById('product-count').textContent = `${state.products.length} منتج`; updateLowStock();
-            }
-
+            function renderProducts() { const tb = document.querySelector('#products-table tbody'); if (!tb) return; if (state.products.length === 0) tb.innerHTML = `<tr><td colspan="9"><div class="empty-state"><i class="fas fa-box-open"></i>لا توجد منتجات</div></td></tr>`; else tb.innerHTML = state.products.map(p => { const pf = prodProfit(p); return `<tr><td>${p.image ? `<img src="${p.image}" class="product-image-thumb">` : '—'}</td><td><strong>${p.name}</strong></td><td>${(p.cost||0).toFixed(0)}</td><td>${(p.price||0).toFixed(0)}</td><td><span class="profit-badge ${pf>=0?'positive':'negative'}">${pf.toFixed(0)}</span></td><td><span class="badge ${p.quantity<=5?'badge-danger':p.quantity<=20?'badge-warning':'badge-success'}">${p.quantity}</span></td><td>${(p.price*p.quantity).toFixed(0)}</td><td>${p.barcode?`<span class="badge badge-primary">${p.barcode}</span>`:'—'}</td><td><div class="action-buttons"><button class="btn btn-primary btn-xs" onclick="editProduct('${p.id}')"><i class="fas fa-edit"></i></button><button class="btn btn-danger btn-xs" onclick="deleteProduct('${p.id}')"><i class="fas fa-trash"></i></button></div></td></tr>`; }).join(''); document.getElementById('product-count').textContent = `${state.products.length} منتج`; updateLowStock(); }
             function renderCustomers() { const tb = document.querySelector('#customers-table tbody'); if (!tb) return; if (state.customers.length === 0) tb.innerHTML = `<tr><td colspan="5"><div class="empty-state"><i class="fas fa-user-slash"></i>لا يوجد عملاء</div></td></tr>`; else tb.innerHTML = state.customers.map(c => { const b = custBal(c.id); const ph = c.phone || ''; return `<tr><td><strong>${c.name}</strong></td><td>${ph ? `<a href="tel:${ph}" class="call-btn"><i class="fas fa-phone"></i> ${ph}</a>` : '—'}</td><td>${c.email || '—'}</td><td><span class="badge ${b>0?'badge-success':b<0?'badge-primary':'badge-warning'}">${b.toFixed(0)} ج.م</span></td><td><div class="action-buttons"><button class="btn btn-success btn-xs" onclick="printCustReceipt('${c.id}')"><i class="fas fa-print"></i></button><button class="btn btn-danger btn-xs" onclick="deleteCustomer('${c.id}')"><i class="fas fa-trash"></i></button></div></td></tr>`; }).join(''); document.getElementById('customer-count').textContent = `${state.customers.length} عميل`; }
-
             function renderSuppliers() { const tb = document.querySelector('#suppliers-table tbody'); if (!tb) return; if (state.suppliers.length === 0) tb.innerHTML = `<tr><td colspan="5"><div class="empty-state"><i class="fas fa-truck"></i>لا يوجد موردين</div></td></tr>`; else tb.innerHTML = state.suppliers.map(s => { const b = suppBal(s.id); const ph = s.phone || ''; return `<tr><td><strong>${s.name}</strong></td><td>${ph ? `<a href="tel:${ph}" class="call-btn"><i class="fas fa-phone"></i> ${ph}</a>` : '—'}</td><td>${s.email || '—'}</td><td><span class="badge ${b>0?'badge-danger':b<0?'badge-primary':'badge-warning'}">${b.toFixed(0)} ج.م</span></td><td><div class="action-buttons"><button class="btn btn-success btn-xs" onclick="printSuppReceipt('${s.id}')"><i class="fas fa-print"></i></button><button class="btn btn-danger btn-xs" onclick="deleteSupplier('${s.id}')"><i class="fas fa-trash"></i></button></div></td></tr>`; }).join(''); document.getElementById('supplier-count').textContent = `${state.suppliers.length} مورد`; }
-
             function renderBalances() { const tcc = totalCustCredit(), tsd = totalSuppDebit(), net = tcc - tsd; document.getElementById('bal-total-customer').textContent = tcc.toFixed(0) + ' ج.م'; document.getElementById('bal-total-supplier').textContent = tsd.toFixed(0) + ' ج.م'; document.getElementById('bal-net').textContent = net.toFixed(0) + ' ج.م'; document.getElementById('bal-net').style.color = net >= 0 ? 'var(--success)' : 'var(--danger)'; const ct = document.querySelector('#balances-customers-table tbody'); if (ct) ct.innerHTML = state.customers.length === 0 ? `<tr><td colspan="5"><div class="empty-state">لا يوجد عملاء</div></td></tr>` : state.customers.map(c => { const ts = getTT('customer', c.id), tp = getPT('customer', c.id); return `<tr><td><strong>${c.name}</strong></td><td>${c.phone||'—'}</td><td>${ts.toFixed(0)}</td><td>${tp.toFixed(0)}</td><td><span class="badge ${ts-tp>0?'badge-success':'badge-warning'}">${(ts-tp).toFixed(0)}</span></td></tr>`; }).join(''); const st = document.querySelector('#balances-suppliers-table tbody'); if (st) st.innerHTML = state.suppliers.length === 0 ? `<tr><td colspan="5"><div class="empty-state">لا يوجد موردين</div></td></tr>` : state.suppliers.map(s => { const tp = getTT('supplier', s.id), tpm = getPT('supplier', s.id); return `<tr><td><strong>${s.name}</strong></td><td>${s.phone||'—'}</td><td>${tp.toFixed(0)}</td><td>${tpm.toFixed(0)}</td><td><span class="badge ${tp-tpm>0?'badge-danger':'badge-warning'}">${(tp-tpm).toFixed(0)}</span></td></tr>`; }).join(''); }
-
             function renderEmployees() { const tb = document.querySelector('#employees-table tbody'); if (!tb) return; if (state.employees.length === 0) tb.innerHTML = `<tr><td colspan="6"><div class="empty-state">لا يوجد موظفين</div></td></tr>`; else tb.innerHTML = state.employees.map(e => `<tr><td><strong>${e.name}</strong></td><td>${e.phone||'—'}</td><td>${e.email||'—'}</td><td>${e.role||'—'}</td><td>${(e.salary||0).toFixed(0)}</td><td><div class="action-buttons"><button class="btn btn-primary btn-xs" onclick="editEmp('${e.id}')"><i class="fas fa-edit"></i></button><button class="btn btn-danger btn-xs" onclick="deleteEmployee('${e.id}')"><i class="fas fa-trash"></i></button></div></td></tr>`).join(''); document.getElementById('employee-count').textContent = `${state.employees.length} موظف`; }
-
             function renderTransactions() { const tb = document.querySelector('#transactions-table tbody'); if (!tb) return; const sorted = [...state.transactions].sort((a, b) => b.date - a.date); if (sorted.length === 0) tb.innerHTML = `<tr><td colspan="7"><div class="empty-state">لا توجد معاملات</div></td></tr>`; else tb.innerHTML = sorted.map(tr => { const party = (tr.type==='customer'?state.customers:state.suppliers).find(x => x.id===tr.partyId); const prod = state.products.find(p => p.id===tr.productId); return `<tr><td>${new Date(tr.date).toLocaleString('ar-EG')}</td><td><span class="badge ${tr.type==='customer'?'badge-success':'badge-warning'}">${tr.type==='customer'?'بيع':'شراء'}</span></td><td>${party?.name||'—'}</td><td>${prod?.name||'—'}</td><td>${tr.quantity}</td><td><strong>${tr.total.toFixed(0)}</strong></td><td><button class="btn btn-danger btn-xs" onclick="deleteTransaction('${tr.id}')"><i class="fas fa-trash"></i></button></td></tr>`; }).join(''); document.getElementById('transaction-count').textContent = `${state.transactions.length} معاملة`; }
-
             function renderPayments() { const tb = document.querySelector('#payments-table tbody'); if (!tb) return; const sorted = [...state.payments].sort((a, b) => b.date - a.date); if (sorted.length === 0) tb.innerHTML = `<tr><td colspan="5"><div class="empty-state">لا توجد دفعات</div></td></tr>`; else tb.innerHTML = sorted.map(p => { const name = (p.partyType==='customer'?state.customers:state.suppliers).find(x => x.id===p.partyId)?.name; return `<tr><td>${new Date(p.date).toLocaleString('ar-EG')}</td><td><span class="badge ${p.partyType==='customer'?'badge-success':'badge-warning'}">${p.partyType==='customer'?'عميل':'مورد'}</span></td><td>${name||'—'}</td><td><strong>${p.amount.toFixed(0)}</strong></td><td><div class="action-buttons"><button class="btn btn-success btn-xs" onclick="printPayReceipt('${p.id}')"><i class="fas fa-print"></i></button><button class="btn btn-danger btn-xs" onclick="deletePayment('${p.id}')"><i class="fas fa-trash"></i></button></div></td></tr>`; }).join(''); document.getElementById('payment-count').textContent = `${state.payments.length} دفعة`; }
-
             function renderAnalysis() { document.getElementById('total-products').textContent = state.products.length; document.getElementById('total-value').textContent = invVal().toFixed(0) + ' ج.م'; document.getElementById('total-cost').textContent = invCost().toFixed(0) + ' ج.م'; document.getElementById('total-profit').textContent = availableBalance().toFixed(0) + ' ج.م'; document.getElementById('total-quantity').textContent = totalQty(); document.getElementById('total-transactions').textContent = state.transactions.length; const tb = document.querySelector('#analysis-table tbody'); if (!tb) return; if (state.products.length === 0) tb.innerHTML = `<tr><td colspan="7"><div class="empty-state">لا توجد بيانات</div></td></tr>`; else { const maxP = Math.max(...state.products.map(p => prodProfit(p) * p.quantity), 1); tb.innerHTML = state.products.map(p => { const pp = prodProfit(p), tp = pp * p.quantity; return `<tr><td><strong>${p.name}</strong></td><td>${p.quantity}</td><td>${(p.cost||0).toFixed(0)}</td><td>${(p.price||0).toFixed(0)}</td><td><span class="profit-badge ${pp>=0?'positive':'negative'}">${pp.toFixed(0)}</span></td><td><strong>${tp.toFixed(0)}</strong></td><td><div class="progress-bar-container"><div class="progress-track"><div class="progress-fill" style="width:${(tp/maxP*100).toFixed(1)}%;"></div></div><span class="progress-label">${(tp/maxP*100).toFixed(1)}%</span></div></td></tr>`; }).join(''); } }
 
             function updatePayInfo() { const ptype = document.getElementById('payment-party-type')?.value; const pid = document.getElementById('payment-party-select')?.value; const infoDiv = document.getElementById('payment-balance-info'); const textEl = document.getElementById('payment-balance-text'); const amountEl = document.getElementById('payment-balance-amount'); const payFullBtn = document.getElementById('pay-full-btn'); const amountInput = document.getElementById('payment-amount'); updateSummary(); if (!pid) { infoDiv.classList.remove('show'); payFullBtn.style.display = 'none'; return; } let balance = 0, name = ''; if (ptype === 'customer') { balance = custBal(pid); name = state.customers.find(c => c.id === pid)?.name || ''; } else { balance = suppBal(pid); name = state.suppliers.find(s => s.id === pid)?.name || ''; } if (balance > 0) { infoDiv.classList.add('show'); textEl.textContent = `${name} - المستحق:`; amountEl.textContent = `${balance.toFixed(0)} ج.م`; amountEl.className = `balance-amount ${ptype === 'customer' ? 'credit' : 'owed'}`; payFullBtn.style.display = 'inline-flex'; payFullBtn.onclick = () => { amountInput.value = balance.toFixed(2); }; } else { infoDiv.classList.add('show'); textEl.textContent = `${name} - تم السداد`; amountEl.textContent = '0 ج.م'; amountEl.className = 'balance-amount'; payFullBtn.style.display = 'none'; } }
-
             function updateTransPrices() { const type = document.getElementById('trans-type')?.value; const prodId = document.getElementById('trans-product')?.value; const qty = parseInt(document.getElementById('trans-qty')?.value) || 0; const up = document.getElementById('trans-unit-price'), td = document.getElementById('trans-total-display'); if (!prodId || !up || !td) return; const prod = state.products.find(p => p.id === prodId); if (!prod) return; const price = type === 'customer' ? prod.price : prod.cost; up.value = price.toFixed(2); td.value = (price * qty).toFixed(2); }
-
             function populateSelects() { const type = document.getElementById('trans-type')?.value; const party = document.getElementById('trans-party'), prod = document.getElementById('trans-product'); if (party) { const items = type === 'customer' ? state.customers : state.suppliers; party.innerHTML = items.length === 0 ? '<option value="">لا توجد بيانات</option>' : items.map(x => `<option value="${x.id}">${x.name}</option>`).join(''); } if (prod) { prod.innerHTML = state.products.length === 0 ? '<option value="">لا توجد منتجات</option>' : state.products.map(p => `<option value="${p.id}">${p.name} (${p.quantity})</option>`).join(''); } updateTransPrices(); const pt = document.getElementById('payment-party-type')?.value, ps = document.getElementById('payment-party-select'); if (ps) { const items = pt === 'customer' ? state.customers : state.suppliers; ps.innerHTML = items.length === 0 ? '<option value="">لا توجد بيانات</option>' : items.map(x => `<option value="${x.id}">${x.name}</option>`).join(''); } updatePayInfo(); }
-
             function refreshAll() { renderProducts(); renderCustomers(); renderSuppliers(); renderBalances(); renderEmployees(); renderTransactions(); renderPayments(); renderAnalysis(); updateSummary(); populateSelects(); updateLowStock(); }
 
-            // ===== CRUD with immediate save =====
+            // ===== CRUD =====
             window.deleteProduct = function(id) { if (!confirm('حذف المنتج؟')) return; state.products = state.products.filter(p => p.id !== id); saveAllData(); refreshAll(); toast('تم الحذف'); };
             window.editProduct = function(id) { const p = state.products.find(p => p.id === id); if (!p) return; document.getElementById('prod-name').value = p.name; document.getElementById('prod-cost').value = p.cost || ''; document.getElementById('prod-price').value = p.price || ''; document.getElementById('prod-qty').value = p.quantity; document.getElementById('prod-barcode').value = p.barcode || ''; if (p.image) updateImgPreview(p.image); state.products = state.products.filter(pr => pr.id !== id); saveAllData(); refreshAll(); toast('عدل المنتج وأعد إضافته', 'info'); document.getElementById('prod-name').focus(); };
             window.deleteCustomer = function(id) { if (!confirm('حذف العميل؟')) return; state.customers = state.customers.filter(c => c.id !== id); saveAllData(); refreshAll(); toast('تم الحذف'); };
@@ -469,7 +395,7 @@
             window.deleteTransaction = function(id) { if (!confirm('حذف المعاملة؟')) return; const tr = state.transactions.find(t => t.id === id); if (tr) { const prod = state.products.find(p => p.id === tr.productId); if (prod) { if (tr.type === 'customer') prod.quantity += tr.quantity; else { prod.quantity -= tr.quantity; if (prod.quantity < 0) prod.quantity = 0; } } } state.transactions = state.transactions.filter(t => t.id !== id); saveAllData(); refreshAll(); toast('تم الحذف'); };
             window.deletePayment = function(id) { if (!confirm('حذف الدفعة؟')) return; state.payments = state.payments.filter(p => p.id !== id); saveAllData(); refreshAll(); toast('تم الحذف'); };
 
-            // ===== IMPROVED RECEIPT FUNCTIONS =====
+            // ===== RECEIPT (FIXED) =====
             let rData = null;
             window.printCustReceipt = function(id) {
                 const c = state.customers.find(x => x.id === id); if (!c) return;
@@ -477,19 +403,7 @@
                 const balance = ts - tp;
                 const transactions = state.transactions.filter(t => t.type === 'customer' && t.partyId === id);
                 const payments = state.payments.filter(p => p.partyType === 'customer' && p.partyId === id);
-                rData = {
-                    type: 'customer',
-                    name: c.name,
-                    phone: c.phone || '—',
-                    email: c.email || '—',
-                    address: c.address || '—',
-                    totalSales: ts,
-                    totalPaid: tp,
-                    balance: balance,
-                    transactions: transactions,
-                    payments: payments,
-                    date: new Date().toLocaleString('ar-EG')
-                };
+                rData = { type: 'customer', name: c.name, phone: c.phone || '', email: c.email || '', address: c.address || '', totalSales: ts, totalPaid: tp, balance: balance, transactions: transactions, payments: payments, date: new Date().toLocaleString('ar-EG') };
                 showReceipt();
             };
             window.printSuppReceipt = function(id) {
@@ -498,19 +412,7 @@
                 const balance = tp - tpm;
                 const transactions = state.transactions.filter(t => t.type === 'supplier' && t.partyId === id);
                 const payments = state.payments.filter(p => p.partyType === 'supplier' && p.partyId === id);
-                rData = {
-                    type: 'supplier',
-                    name: s.name,
-                    phone: s.phone || '—',
-                    email: s.email || '—',
-                    address: s.address || '—',
-                    totalPurchases: tp,
-                    totalPaid: tpm,
-                    balance: balance,
-                    transactions: transactions,
-                    payments: payments,
-                    date: new Date().toLocaleString('ar-EG')
-                };
+                rData = { type: 'supplier', name: s.name, phone: s.phone || '', email: s.email || '', address: s.address || '', totalPurchases: tp, totalPaid: tpm, balance: balance, transactions: transactions, payments: payments, date: new Date().toLocaleString('ar-EG') };
                 showReceipt();
             };
             window.printPayReceipt = function(id) {
@@ -518,24 +420,13 @@
                 const pn = (p.partyType==='customer'?state.customers:state.suppliers).find(x => x.id===p.partyId);
                 const tb = getTT(p.partyType, p.partyId), pb = getPT(p.partyType, p.partyId) - p.amount;
                 const bb = tb - pb, ba = bb - p.amount;
-                rData = {
-                    type: 'payment',
-                    partyType: p.partyType,
-                    name: pn?.name || '—',
-                    phone: pn?.phone || '—',
-                    amount: p.amount,
-                    balanceBefore: bb,
-                    balanceAfter: ba,
-                    totalAmount: tb,
-                    totalPaidBefore: pb,
-                    date: new Date(p.date).toLocaleString('ar-EG')
-                };
+                rData = { type: 'payment', partyType: p.partyType, name: pn?.name || '—', phone: pn?.phone || '', amount: p.amount, balanceBefore: bb, balanceAfter: ba, totalAmount: tb, totalPaidBefore: pb, date: new Date(p.date).toLocaleString('ar-EG') };
                 showReceipt();
             };
 
             function showReceipt() {
                 const m = document.getElementById('receiptModal'), d = document.getElementById('receiptDetails');
-                if (!rData) return;
+                if (!rData || !d) return;
 
                 let typeLabel = '', typeClass = '';
                 if (rData.type === 'customer') { typeLabel = 'كشف حساب عميل'; typeClass = 'customer'; }
@@ -548,7 +439,6 @@
                     <p style="font-size:0.7rem;color:var(--gray-500);">نظام إدارة المخزون والمبيعات</p>
                     <span class="receipt-type ${typeClass}">${typeLabel}</span>
                 </div>
-
                 <div class="receipt-section">
                     <div class="receipt-section-title">📋 بيانات ${rData.type === 'supplier' ? 'المورد' : rData.type === 'customer' ? 'العميل' : 'الدفعة'}</div>
                     <div class="receipt-row"><span class="label">الاسم</span><span class="value">${rData.name}</span></div>
@@ -563,117 +453,83 @@
                     const labelTotal = isCustomer ? '💰 إجمالي المشتريات' : '🛒 إجمالي المشتريات من المورد';
                     const labelPaid = isCustomer ? '💳 إجمالي المدفوع من العميل' : '💳 إجمالي المدفوع للمورد';
                     const totalVal = isCustomer ? rData.totalSales : rData.totalPurchases;
-
-                    h += `
-                    <div class="receipt-section">
-                        <div class="receipt-section-title">📊 ملخص الحساب</div>
-                        <div class="receipt-row"><span class="label">${labelTotal}</span><span class="value">${(totalVal).toFixed(0)} ج.م</span></div>
-                        <div class="receipt-row"><span class="label">${labelPaid}</span><span class="value">${(rData.totalPaid).toFixed(0)} ج.م</span></div>
-                    </div>`;
-
-                    // Recent transactions
+                    h += `<div class="receipt-section"><div class="receipt-section-title">📊 ملخص الحساب</div><div class="receipt-row"><span class="label">${labelTotal}</span><span class="value">${(totalVal).toFixed(0)} ج.م</span></div><div class="receipt-row"><span class="label">${labelPaid}</span><span class="value">${(rData.totalPaid).toFixed(0)} ج.م</span></div></div>`;
                     if (rData.transactions && rData.transactions.length > 0) {
                         h += `<div class="receipt-section"><div class="receipt-section-title">📝 آخر المعاملات</div>`;
                         const recentTx = rData.transactions.slice(-5).reverse();
-                        recentTx.forEach(tx => {
-                            const prod = state.products.find(p => p.id === tx.productId);
-                            h += `<div class="receipt-row"><span class="label">${new Date(tx.date).toLocaleDateString('ar-EG')} - ${prod?.name || '—'} (${tx.quantity}x)</span><span class="value">${tx.total.toFixed(0)} ج.م</span></div>`;
-                        });
+                        recentTx.forEach(tx => { const prod = state.products.find(p => p.id === tx.productId); h += `<div class="receipt-row"><span class="label">${new Date(tx.date).toLocaleDateString('ar-EG')} - ${prod?.name || '—'} (${tx.quantity}x)</span><span class="value">${tx.total.toFixed(0)} ج.م</span></div>`; });
                         h += `</div>`;
                     }
-
-                    // Recent payments
                     if (rData.payments && rData.payments.length > 0) {
                         h += `<div class="receipt-section"><div class="receipt-section-title">💵 آخر المدفوعات</div>`;
                         const recentPay = rData.payments.slice(-5).reverse();
-                        recentPay.forEach(pay => {
-                            h += `<div class="receipt-row"><span class="label">${new Date(pay.date).toLocaleDateString('ar-EG')}</span><span class="value" style="color:var(--success);">${pay.amount.toFixed(0)} ج.م</span></div>`;
-                        });
+                        recentPay.forEach(pay => { h += `<div class="receipt-row"><span class="label">${new Date(pay.date).toLocaleDateString('ar-EG')}</span><span class="value" style="color:var(--success);">${pay.amount.toFixed(0)} ج.م</span></div>`; });
                         h += `</div>`;
                     }
-
-                    // Balance section
                     const balanceClass = rData.balance > 0 ? (isCustomer ? 'balance-positive' : 'balance-negative') : rData.balance < 0 ? (isCustomer ? 'balance-negative' : 'balance-positive') : 'balance-neutral';
-                    const balanceLabel = isCustomer ?
-                        (rData.balance > 0 ? 'المبلغ المتبقي على العميل' : rData.balance < 0 ? 'المبلغ الزائد (دائن)' : 'تم السداد بالكامل') :
-                        (rData.balance > 0 ? 'المبلغ المتبقي للمورد' : rData.balance < 0 ? 'المبلغ الزائد (مدين)' : 'تم السداد بالكامل');
+                    const balanceLabel = isCustomer ? (rData.balance > 0 ? 'المبلغ المتبقي على العميل' : rData.balance < 0 ? 'المبلغ الزائد (دائن)' : 'تم السداد بالكامل') : (rData.balance > 0 ? 'المبلغ المتبقي للمورد' : rData.balance < 0 ? 'المبلغ الزائد (مدين)' : 'تم السداد بالكامل');
                     const balanceIcon = rData.balance > 0 ? '📋' : rData.balance < 0 ? '↩️' : '✅';
-
-                    h += `
-                    <div class="receipt-total-section">
-                        <div class="receipt-total-row ${balanceClass}">
-                            <span>${balanceIcon} ${balanceLabel}</span>
-                            <span>${rData.balance.toFixed(0)} ج.م</span>
-                        </div>
-                    </div>`;
+                    h += `<div class="receipt-total-section"><div class="receipt-total-row ${balanceClass}"><span>${balanceIcon} ${balanceLabel}</span><span>${rData.balance.toFixed(0)} ج.م</span></div></div>`;
                 } else if (rData.type === 'payment') {
                     const isCustPay = rData.partyType === 'customer';
-                    h += `
-                    <div class="receipt-section">
-                        <div class="receipt-section-title">💵 تفاصيل الدفعة</div>
-                        <div class="receipt-row"><span class="label">نوع الدفعة</span><span class="value">${isCustPay ? 'استلام من عميل' : 'دفع إلى مورد'}</span></div>
-                        <div class="receipt-row"><span class="label">💰 المبلغ المدفوع</span><span class="value" style="font-size:1.1rem;color:var(--success);"><strong>${rData.amount.toFixed(0)} ج.م</strong></span></div>
-                        <div class="receipt-row"><span class="label">📊 إجمالي المستحق</span><span class="value">${rData.totalAmount.toFixed(0)} ج.م</span></div>
-                        <div class="receipt-row"><span class="label">💳 المدفوع سابقاً</span><span class="value">${rData.totalPaidBefore.toFixed(0)} ج.م</span></div>
-                    </div>
-                    <div class="receipt-total-section">
-                        <div class="receipt-total-row ${rData.balanceBefore > 0 ? 'balance-negative' : 'balance-positive'}">
-                            <span>📋 المبلغ قبل الدفعة</span>
-                            <span>${rData.balanceBefore.toFixed(0)} ج.م</span>
-                        </div>
-                        <div class="receipt-total-row ${rData.balanceAfter > 0 ? 'balance-negative' : 'balance-positive'}">
-                            <span>📋 المتبقي بعد الدفعة</span>
-                            <span>${rData.balanceAfter.toFixed(0)} ج.م</span>
-                        </div>
-                    </div>`;
+                    h += `<div class="receipt-section"><div class="receipt-section-title">💵 تفاصيل الدفعة</div><div class="receipt-row"><span class="label">نوع الدفعة</span><span class="value">${isCustPay ? 'استلام من عميل' : 'دفع إلى مورد'}</span></div><div class="receipt-row"><span class="label">💰 المبلغ المدفوع</span><span class="value" style="font-size:1.1rem;color:var(--success);"><strong>${rData.amount.toFixed(0)} ج.م</strong></span></div><div class="receipt-row"><span class="label">📊 إجمالي المستحق</span><span class="value">${rData.totalAmount.toFixed(0)} ج.م</span></div><div class="receipt-row"><span class="label">💳 المدفوع سابقاً</span><span class="value">${rData.totalPaidBefore.toFixed(0)} ج.م</span></div></div><div class="receipt-total-section"><div class="receipt-total-row ${rData.balanceBefore > 0 ? 'balance-negative' : 'balance-positive'}"><span>📋 المبلغ قبل الدفعة</span><span>${rData.balanceBefore.toFixed(0)} ج.م</span></div><div class="receipt-total-row ${rData.balanceAfter > 0 ? 'balance-negative' : 'balance-positive'}"><span>📋 المتبقي بعد الدفعة</span><span>${rData.balanceAfter.toFixed(0)} ج.م</span></div></div>`;
                 }
 
-                h += `
-                <div class="receipt-footer">
-                    <p>شكراً لتعاملكم معنا 🤝</p>
-                    <p style="margin-top:0.2rem;">للاستفسار: يرجى التواصل مع الإدارة</p>
-                </div>
-                <div class="receipt-stamp">
-                    <span>✅ إيصال معتمد</span>
-                </div>`;
+                h += `<div class="receipt-footer"><p>شكراً لتعاملكم معنا 🤝</p><p style="margin-top:0.2rem;">للاستفسار: يرجى التواصل مع الإدارة</p></div><div class="receipt-stamp"><span>✅ إيصال معتمد</span></div>`;
 
                 d.innerHTML = h;
                 m.classList.add('active');
             }
             window.closeReceipt = function() { document.getElementById('receiptModal').classList.remove('active'); rData = null; };
             window.printReceipt = function() {
-                const c = document.getElementById('receiptContent');
-                const w = window.open('', '_blank', 'width=400,height=650');
-                if (w) {
-                    w.document.write(`
-                        <html dir="rtl"><head><title>إيصال - متجر ذكي</title>
-                        <style>
-                            @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
-                            *{margin:0;padding:0;box-sizing:border-box}
-                            body{font-family:'Cairo','Segoe UI',sans-serif;padding:20px;background:#fff;color:#334155;font-size:14px}
-                            .receipt-print{max-width:380px;margin:0 auto}
-                            .receipt-header{text-align:center;border-bottom:2px dashed #cbd5e1;padding-bottom:12px;margin-bottom:12px}
-                            .receipt-header h3{font-size:1.4rem;color:#0f172a}
-                            .receipt-type{display:inline-block;padding:4px 14px;border-radius:14px;font-size:0.8rem;font-weight:700;margin:6px 0}
-                            .receipt-type.customer{background:#dcfce7;color:#166534}
-                            .receipt-type.supplier{background:#fee2e2;color:#991b1b}
-                            .receipt-type.payment{background:#dbeafe;color:#1e40af}
-                            .receipt-section{margin:10px 0}
-                            .receipt-section-title{font-size:0.7rem;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:6px;letter-spacing:0.5px}
-                            .receipt-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dotted #f1f5f9;font-size:0.85rem}
-                            .receipt-row .label{color:#64748b;font-size:0.78rem}
-                            .receipt-row .value{font-weight:600;color:#334155}
-                            .receipt-total-section{margin-top:10px;padding-top:10px;border-top:2px solid #cbd5e1}
-                            .receipt-total-row{display:flex;justify-content:space-between;padding:6px 0;font-weight:700;font-size:1rem}
-                            .balance-positive{color:#22c55e}.balance-negative{color:#ef4444}.balance-neutral{color:#3b82f6}
-                            .receipt-footer{text-align:center;font-size:0.7rem;color:#94a3b8;margin-top:12px;border-top:1px solid #e2e8f0;padding-top:10px;line-height:1.6}
-                            .receipt-stamp{text-align:center;margin-top:10px}
-                            .receipt-stamp span{display:inline-block;border:2px solid #94a3b8;border-radius:6px;padding:5px 12px;font-size:0.7rem;font-weight:700;color:#94a3b8;text-transform:uppercase}
-                            @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
-                        </style></head>
-                        <body><div class="receipt-print">${c.innerHTML}</div><script>window.onload=function(){window.print();}<\/script></body></html>
+                const d = document.getElementById('receiptDetails');
+                if (!d || !d.innerHTML) { toast('لا يوجد إيصال للطباعة', 'error'); return; }
+                const receiptHTML = d.innerHTML;
+
+                const printWindow = window.open('', '_blank', 'width=400,height=650');
+                if (printWindow) {
+                    printWindow.document.open();
+                    printWindow.document.write(`
+                        <!DOCTYPE html>
+                        <html dir="rtl">
+                        <head>
+                            <meta charset="UTF-8">
+                            <title>إيصال - متجر ذكي</title>
+                            <style>
+                                *{margin:0;padding:0;box-sizing:border-box}
+                                body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;padding:20px;background:#fff;color:#334155;font-size:14px}
+                                .receipt-print{max-width:380px;margin:0 auto}
+                                .receipt-header{text-align:center;border-bottom:2px dashed #cbd5e1;padding-bottom:12px;margin-bottom:12px}
+                                .receipt-header h3{font-size:1.4rem;color:#0f172a}
+                                .receipt-type{display:inline-block;padding:4px 14px;border-radius:14px;font-size:0.8rem;font-weight:700;margin:6px 0}
+                                .receipt-type.customer{background:#dcfce7;color:#166534}
+                                .receipt-type.supplier{background:#fee2e2;color:#991b1b}
+                                .receipt-type.payment{background:#dbeafe;color:#1e40af}
+                                .receipt-section{margin:10px 0}
+                                .receipt-section-title{font-size:0.7rem;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:6px;letter-spacing:0.5px}
+                                .receipt-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dotted #f1f5f9;font-size:0.85rem}
+                                .receipt-row .label{color:#64748b;font-size:0.78rem}
+                                .receipt-row .value{font-weight:600;color:#334155}
+                                .receipt-total-section{margin-top:10px;padding-top:10px;border-top:2px solid #cbd5e1}
+                                .receipt-total-row{display:flex;justify-content:space-between;padding:6px 0;font-weight:700;font-size:1rem}
+                                .balance-positive{color:#22c55e}.balance-negative{color:#ef4444}.balance-neutral{color:#3b82f6}
+                                .receipt-footer{text-align:center;font-size:0.7rem;color:#94a3b8;margin-top:12px;border-top:1px solid #e2e8f0;padding-top:10px;line-height:1.6}
+                                .receipt-stamp{text-align:center;margin-top:10px}
+                                .receipt-stamp span{display:inline-block;border:2px solid #94a3b8;border-radius:6px;padding:5px 12px;font-size:0.7rem;font-weight:700;color:#94a3b8;text-transform:uppercase}
+                                @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+                            </style>
+                        </head>
+                        <body>
+                            <div class="receipt-print">${receiptHTML}</div>
+                            <script>
+                                window.onload = function() {
+                                    setTimeout(function() { window.print(); }, 300);
+                                };
+                            <\/script>
+                        </body>
+                        </html>
                     `);
-                    w.document.close();
+                    printWindow.document.close();
                 }
             };
 
@@ -698,39 +554,13 @@
             document.getElementById('close-barcode-upload-btn')?.addEventListener('click', () => { document.getElementById('barcode-upload-section').style.display = 'none'; document.getElementById('barcode-image-file').value = ''; });
             document.getElementById('decode-barcode-btn')?.addEventListener('click', () => { const f = document.getElementById('barcode-image-file').files[0]; if (!f) { toast('اختر صورة', 'error'); return; } const r = new FileReader(); r.onload = function(e) { const img = new Image(); img.onload = function() { Quagga.decodeSingle({ src: e.target.result, numOfWorkers: 0, decoder: { readers: ["code_128_reader", "ean_reader", "ean_8_reader", "code_39_reader", "upc_reader"] } }, function(res) { if (res?.codeResult) { document.getElementById('prod-barcode').value = res.codeResult.code; document.getElementById('barcode-upload-section').style.display = 'none'; document.getElementById('barcode-image-file').value = ''; toast('تم فك الباركود: ' + res.codeResult.code); } else toast('لم يتم العثور على باركود', 'error'); }); }; img.src = e.target.result; }; r.readAsDataURL(f); });
 
-            // ===== Event Listeners (with saveAllData after each operation) =====
-            document.getElementById('add-product-btn')?.addEventListener('click', () => {
-                const name = document.getElementById('prod-name').value.trim(), cost = parseFloat(document.getElementById('prod-cost').value), price = parseFloat(document.getElementById('prod-price').value), qty = parseInt(document.getElementById('prod-qty').value) || 0, barcode = document.getElementById('prod-barcode').value.trim(), image = document.getElementById('prod-image-data').value;
-                if (!name) { toast('أدخل اسم المنتج', 'error'); return; }
-                if (isNaN(price) || price <= 0) { toast('أدخل سعر بيع صحيح', 'error'); return; }
-                state.products.push({ id: genId(), name, cost: cost || 0, price, quantity: qty, barcode, image });
-                saveAllData();
-                ['prod-name', 'prod-cost', 'prod-price', 'prod-qty', 'prod-barcode'].forEach(id => document.getElementById(id).value = '');
-                updateImgPreview(null); refreshAll(); toast(`تم إضافة "${name}" بنجاح`);
-            });
-
+            // ===== Event Listeners =====
+            document.getElementById('add-product-btn')?.addEventListener('click', () => { const name = document.getElementById('prod-name').value.trim(), cost = parseFloat(document.getElementById('prod-cost').value), price = parseFloat(document.getElementById('prod-price').value), qty = parseInt(document.getElementById('prod-qty').value) || 0, barcode = document.getElementById('prod-barcode').value.trim(), image = document.getElementById('prod-image-data').value; if (!name) { toast('أدخل اسم المنتج', 'error'); return; } if (isNaN(price) || price <= 0) { toast('أدخل سعر بيع صحيح', 'error'); return; } state.products.push({ id: genId(), name, cost: cost || 0, price, quantity: qty, barcode, image }); saveAllData(); ['prod-name', 'prod-cost', 'prod-price', 'prod-qty', 'prod-barcode'].forEach(id => document.getElementById(id).value = ''); updateImgPreview(null); refreshAll(); toast(`تم إضافة "${name}" بنجاح`); });
             document.getElementById('add-customer-btn')?.addEventListener('click', () => { const name = document.getElementById('cust-name').value.trim(); if (!name) { toast('أدخل اسم العميل', 'error'); return; } state.customers.push({ id: genId(), name, phone: document.getElementById('cust-phone').value.trim(), email: document.getElementById('cust-email').value.trim(), address: document.getElementById('cust-address').value.trim() }); saveAllData(); ['cust-name', 'cust-phone', 'cust-email', 'cust-address'].forEach(id => document.getElementById(id).value = ''); refreshAll(); toast(`تم إضافة "${name}"`); });
             document.getElementById('add-supplier-btn')?.addEventListener('click', () => { const name = document.getElementById('sup-name').value.trim(); if (!name) { toast('أدخل اسم المورد', 'error'); return; } state.suppliers.push({ id: genId(), name, phone: document.getElementById('sup-phone').value.trim(), email: document.getElementById('sup-email').value.trim(), address: document.getElementById('sup-address').value.trim() }); saveAllData(); ['sup-name', 'sup-phone', 'sup-email', 'sup-address'].forEach(id => document.getElementById(id).value = ''); refreshAll(); toast(`تم إضافة "${name}"`); });
             document.getElementById('add-employee-btn')?.addEventListener('click', () => { const name = document.getElementById('emp-name').value.trim(); if (!name) { toast('أدخل اسم الموظف', 'error'); return; } state.employees.push({ id: genId(), name, phone: document.getElementById('emp-phone').value.trim(), email: document.getElementById('emp-email').value.trim(), role: document.getElementById('emp-role').value.trim(), salary: parseFloat(document.getElementById('emp-salary').value) || 0 }); saveAllData(); ['emp-name', 'emp-phone', 'emp-email', 'emp-role', 'emp-salary'].forEach(id => document.getElementById(id).value = ''); refreshAll(); toast(`تم إضافة "${name}"`); });
-
             document.getElementById('add-transaction-btn')?.addEventListener('click', () => { const type = document.getElementById('trans-type').value, partyId = document.getElementById('trans-party').value, prodId = document.getElementById('trans-product').value, qty = parseInt(document.getElementById('trans-qty').value) || 0; if (!partyId) { toast('اختر الطرف', 'error'); return; } if (!prodId) { toast('اختر المنتج', 'error'); return; } if (qty <= 0) { toast('الكمية > 0', 'error'); return; } const prod = state.products.find(p => p.id === prodId); if (!prod) { toast('المنتج غير موجود', 'error'); return; } if (type === 'customer' && prod.quantity < qty) { toast('الكمية غير متوفرة', 'error'); return; } if (type === 'customer') prod.quantity -= qty; else prod.quantity += qty; const total = type === 'customer' ? (qty * prod.price) : (qty * prod.cost); state.transactions.push({ id: genId(), type, partyId, productId: prodId, quantity: qty, total, date: Date.now() }); saveAllData(); document.getElementById('trans-qty').value = '1'; refreshAll(); toast(`تم تسجيل ${type==='customer'?'بيع':'شراء'} بقيمة ${total.toFixed(0)}`); });
-
-            document.getElementById('add-payment-btn')?.addEventListener('click', () => {
-                const ptype = document.getElementById('payment-party-type').value, pid = document.getElementById('payment-party-select').value, amount = parseFloat(document.getElementById('payment-amount').value);
-                if (!pid) { toast('اختر الطرف', 'error'); return; }
-                if (isNaN(amount) || amount <= 0) { toast('أدخل مبلغ صحيح', 'error'); return; }
-                if (ptype === 'supplier') {
-                    const avail = availableBalance();
-                    if (amount > avail) {
-                        toast(`❌ الرصيد المتاح غير كافي! المتاح: ${avail.toFixed(0)} ج.م فقط`, 'error');
-                        return;
-                    }
-                }
-                state.payments.push({ id: genId(), partyType: ptype, partyId: pid, amount, date: Date.now() });
-                saveAllData();
-                document.getElementById('payment-amount').value = '';
-                refreshAll(); toast(`تم تسجيل ${amount.toFixed(0)} ج.م`);
-            });
+            document.getElementById('add-payment-btn')?.addEventListener('click', () => { const ptype = document.getElementById('payment-party-type').value, pid = document.getElementById('payment-party-select').value, amount = parseFloat(document.getElementById('payment-amount').value); if (!pid) { toast('اختر الطرف', 'error'); return; } if (isNaN(amount) || amount <= 0) { toast('أدخل مبلغ صحيح', 'error'); return; } if (ptype === 'supplier') { const avail = availableBalance(); if (amount > avail) { toast(`❌ الرصيد المتاح غير كافي! المتاح: ${avail.toFixed(0)} ج.م فقط`, 'error'); return; } } state.payments.push({ id: genId(), partyType: ptype, partyId: pid, amount, date: Date.now() }); saveAllData(); document.getElementById('payment-amount').value = ''; refreshAll(); toast(`تم تسجيل ${amount.toFixed(0)} ج.م`); });
 
             document.getElementById('export-data-btn')?.addEventListener('click', exportData);
             document.getElementById('import-data-btn')?.addEventListener('click', () => document.getElementById('import-data-file').click());
