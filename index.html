@@ -297,8 +297,6 @@
                     <div class="btn-group">
                         <button id="add-product-btn" class="btn btn-success"><i class="fas fa-plus"></i> حفظ في قاعدة البيانات</button>
                         <button id="open-camera-btn" class="btn btn-outline"><i class="fas fa-qrcode"></i> فتح الماسح الضوئي</button>
-                        <button id="scan-barcode-from-image-btn" class="btn btn-outline"><i class="fas fa-image"></i> قراءة باركود من صورة</button>
-                        <input type="file" id="barcode-image-input" accept="image/*" style="display:none;">
                     </div>
                     <div id="camera-section" style="display:none;margin-top:0.7rem;">
                         <div class="camera-container"><div id="scanner-viewport"></div></div>
@@ -336,7 +334,7 @@
                 <div class="stats-grid"><div class="stat-card"><span>💳</span><div class="stat-value positive" id="bal-total-customer">0</div><div class="stat-label">إجمالي ديون العملاء لنا</div></div><div class="stat-card"><span>📤</span><div class="stat-value negative" id="bal-total-supplier">0</div><div class="stat-label">إجمالي ديون الموردين علينا</div></div><div class="stat-card"><span>📊</span><div class="stat-value" id="bal-net">0</div><div class="stat-label">الصافي المعلق بالخارج</div></div></div>
                 <h3 style="color:var(--primary);font-size:0.95rem; margin-bottom:0.5rem;"><i class="fas fa-users"></i> تفاصيل مستحقات العملاء</h3><div class="table-wrapper"><table id="balances-customers-table"><thead><tr><th>العميل</th><th>الهاتف</th><th>حجم المشتريات الإجمالي</th><th>إجمالي ما تم سداده</th><th>المتبقي بذمته للآن</th></tr></thead><tbody></tbody></table></div>
                 <h3 style="color:var(--danger);font-size:0.95rem; margin-top:1.5rem; margin-bottom:0.5rem;"><i class="fas fa-truck"></i> تفاصيل مستحقات الشركات الموردة</h3><div class="table-wrapper"><table id="balances-suppliers-table"><thead><tr><th>المورد</th><th>الهاتف</th><th>حجم المشتريات الإجمالي</th><th>إجمالي ما تم سداده</th><th>المتبقي له بذمتنا للفواتير</th></tr></thead><tbody></tbody></table></div>
-            </div>
+            </div></div>
 
             <!-- قسم الفواتير والمعاملات -->
             <div id="transactions" class="section">
@@ -399,14 +397,14 @@
                 <div class="card"><div class="card-header"><h2><i class="fas fa-chart-line"></i> لوحة البيانات التحليلية المجمعة</h2></div>
                 <div class="stats-grid"><div class="stat-card"><span>📦</span><div class="stat-value" id="total-products">0</div><div class="stat-label">عدد الأنواع المسجلة</div></div><div class="stat-card"><span>💰</span><div class="stat-value" id="total-value">0</div><div class="stat-label">قيمة البيع الكلية الافتراضية</div></div><div class="stat-card"><span>📊</span><div class="stat-value" id="total-cost">0</div><div class="stat-label">قيمة رأس المال المدفوع بالبضائع</div></div><div class="stat-card"><span>📈</span><div class="stat-value" id="total-profit">0</div><div class="stat-label">السيولة الحالية المتاحة بالخزنة</div></div><div class="stat-card"><span>📊</span><div class="stat-value" id="total-quantity">0</div><div class="stat-label">إجمالي القطع المخزنة</div></div><div class="stat-card"><span>📋</span><div class="stat-value" id="total-transactions">0</div><div class="stat-label">عدد الفواتير الكلي</div></div></div>
                 <div class="table-wrapper"><table id="analysis-table"><thead><tr><th>اسم المنتج الكتالوجي</th><th>الكمية المتاحة</th><th>تكلفة الشراء</th><th>سعر البيع المعين</th><th>الهامش الربحي للقطعة</th><th>الربح الكلي المحتمل للباقي</th></tr></thead><tbody></tbody></table></div>
-            </div>
+            </div></div>
 
             <!-- قسم خيارات النظام -->
             <div id="settings" class="section">
                 <div class="card"><div class="card-header"><h2><i class="fas fa-cog"></i> تهيئة وتأمين البيانات وتصدير النسخ الاحتياطية</h2></div>
                 <div class="btn-group"><button id="export-data-btn" class="btn btn-primary"><i class="fas fa-download"></i> تصدير البيانات بالكامل وحفظها كملف خارجي</button><button id="import-data-btn" class="btn btn-success"><i class="fas fa-upload"></i> استيراد ملف البيانات وحفظه داخل المتصفح</button><button id="clear-data-btn" class="btn btn-danger"><i class="fas fa-trash-alt"></i> تهيئة ومسح شامل لبيانات المتجر</button></div>
                 <input type="file" id="import-data-file" accept=".json" style="display:none;">
-            </div>
+            </div></div>
         </div>
     </div>
 
@@ -1223,52 +1221,6 @@
 
         var stopCamBtn = document.getElementById('stop-camera-btn');
         if (stopCamBtn) { stopCamBtn.addEventListener('click', stopBarcode); }
-
-        // ===== الميزة الجديدة: قراءة الباركود من صورة محفوظة على الهاتف =====
-        var scanBarcodeFromImageBtn = document.getElementById('scan-barcode-from-image-btn');
-        var barcodeImageInput = document.getElementById('barcode-image-input');
-
-        if (scanBarcodeFromImageBtn && barcodeImageInput) {
-            scanBarcodeFromImageBtn.addEventListener('click', function() {
-                barcodeImageInput.click();
-            });
-
-            barcodeImageInput.addEventListener('change', function(e) {
-                var file = e.target.files[0];
-                if (!file) return;
-                
-                // إظهار رسالة للمستخدم بأن العملية جارية
-                toast('جارٍ تحليل الصورة واستخراج الباركود...', 'info');
-                
-                var reader = new FileReader();
-                reader.onload = function(event) {
-                    var imageDataUrl = event.target.result;
-                    
-                    // استخدام Quagga لقراءة الباركود من الصورة
-                    Quagga.decodeSingle({
-                        src: imageDataUrl,
-                        numOfWorkers: 0,
-                        inputStream: {
-                            size: 800
-                        },
-                        decoder: {
-                            readers: ["code_128_reader", "ean_reader", "ean_8_reader", "code_39_reader", "upc_reader"]
-                        }
-                    }, function(result) {
-                        if (result && result.codeResult) {
-                            var barcodeValue = result.codeResult.code;
-                            document.getElementById('prod-barcode').value = barcodeValue;
-                            toast('تم استخراج الباركود بنجاح: ' + barcodeValue, 'success');
-                        } else {
-                            toast('عذراً، لم يتم التعرف على أي باركود في الصورة. تأكد من وضوح الصورة وجودة الباركود.', 'error');
-                        }
-                        // مسح قيمة الإدخال للسماح باختيار نفس الملف مرة أخرى
-                        barcodeImageInput.value = '';
-                    });
-                };
-                reader.readAsDataURL(file);
-            });
-        }
 
         // ===== مستمعي الأحداث والربط لجميع العناصر الحيوية بالنظام لتفادي أي أخطاء متوقعة =====
         document.getElementById('add-product-btn').addEventListener('click', function() {
