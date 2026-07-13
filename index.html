@@ -297,6 +297,8 @@
                     <div class="btn-group">
                         <button id="add-product-btn" class="btn btn-success"><i class="fas fa-plus"></i> حفظ في قاعدة البيانات</button>
                         <button id="open-camera-btn" class="btn btn-outline"><i class="fas fa-qrcode"></i> فتح الماسح الضوئي</button>
+                        <button id="scan-from-image-btn" class="btn btn-outline"><i class="fas fa-image"></i> قراءة الباركود من صورة</button>
+                        <input type="file" id="barcode-image-input" accept="image/*" style="display:none;">
                     </div>
                     <div id="camera-section" style="display:none;margin-top:0.7rem;">
                         <div class="camera-container"><div id="scanner-viewport"></div></div>
@@ -1216,6 +1218,47 @@
                         stopBarcode();
                     }
                 });
+            });
+        }
+
+        // ===== زر قراءة الباركود من صورة ثابتة =====
+        var scanImageBtn = document.getElementById('scan-from-image-btn');
+        var barcodeImageInput = document.getElementById('barcode-image-input');
+        if (scanImageBtn && barcodeImageInput) {
+            scanImageBtn.addEventListener('click', function() {
+                barcodeImageInput.click();
+            });
+            barcodeImageInput.addEventListener('change', function(e) {
+                var file = e.target.files[0];
+                if (!file) return;
+                var reader = new FileReader();
+                reader.onload = function(ev) {
+                    var img = new Image();
+                    img.src = ev.target.result;
+                    img.onload = function() {
+                        var canvas = document.createElement('canvas');
+                        var ctx = canvas.getContext('2d');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx.drawImage(img, 0, 0, img.width, img.height);
+                        var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        Quagga.decodeSingle({
+                            src: canvas.toDataURL(),
+                            numOfWorkers: 0,
+                            inputStream: { size: 800 },
+                            decoder: { readers: ["code_128_reader", "ean_reader", "ean_8_reader", "code_39_reader", "upc_reader", "code_39_vin_reader"] },
+                        }, function(result) {
+                            if (result && result.codeResult) {
+                                document.getElementById('prod-barcode').value = result.codeResult.code;
+                                toast('تم استخراج الباركود من الصورة: ' + result.codeResult.code, 'success');
+                            } else {
+                                toast('لم يتم التعرف على باركود صالح في الصورة. تأكد من وضوح الصورة.', 'error');
+                            }
+                        });
+                    };
+                };
+                reader.readAsDataURL(file);
+                barcodeImageInput.value = '';
             });
         }
 
